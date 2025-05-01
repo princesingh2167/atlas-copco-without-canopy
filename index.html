@@ -23,7 +23,6 @@
       #model-viewer {
         width: 100%;
         height: 100%;
-        /* background-color: #eee; */
       }
       
       #loading-overlay {
@@ -107,14 +106,17 @@
         <model-viewer 
           id="model-viewer" 
           src="1350.glb" 
-          ar 
+          alt="3D model"
+          ar
           ar-modes="webxr scene-viewer quick-look" 
+          ar-scale="auto"
           camera-controls 
+          environment-image="neutral"
           tone-mapping="neutral" 
-          poster="poster.webp" 
           shadow-intensity="1"
           exposure="0.5"
           auto-rotate
+          ios-src="1350.usdz"
         >
           <div class="progress-bar hide" slot="progress-bar">
             <div class="update-bar"></div>
@@ -127,6 +129,10 @@
           </div>
         </model-viewer>
       </div>
+      
+      <div style="margin-top: 20px;">
+        <p id="ar-status">AR not available on this device or browser</p>
+      </div>
     </div>
 
     <script
@@ -134,48 +140,95 @@
       src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"
     ></script>
     <script>
-      // Get the elements
-      const modelViewer = document.getElementById('model-viewer');
-      const loadingOverlay = document.getElementById('loading-overlay');
-      const progressBar = document.querySelector('.update-bar');
-
-      // Hide loading overlay when model is loaded
-      modelViewer.addEventListener('load', () => {
-        loadingOverlay.classList.add('hide');
-      });
-
-      // Also listen for the 'model-visibility' event which might be more reliable
-      modelViewer.addEventListener('model-visibility', (event) => {
-        if (event.detail.visible) {
-          loadingOverlay.classList.add('hide');
-        }
-      });
-
-      // Show loading progress
-      modelViewer.addEventListener('progress', (event) => {
-        const progressPercent = event.detail.totalProgress * 100;
-        progressBar.style.width = `${progressPercent}%`;
+      document.addEventListener('DOMContentLoaded', function() {
+        // Get the elements
+        const modelViewer = document.getElementById('model-viewer');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const progressBar = document.querySelector('.update-bar');
+        const arStatus = document.getElementById('ar-status');
         
-        // If progress reaches 100%, hide the overlay
-        if (progressPercent >= 100) {
-          setTimeout(() => {
-            loadingOverlay.classList.add('hide');
-          }, 500); // Short delay to ensure model has rendered
+        // Check if AR is supported
+        if (modelViewer) {
+          // Update the AR status message based on browser support
+          if (window.WebXRPolyfill) {
+            arStatus.textContent = "AR supported through polyfill";
+          } else if ('xr' in navigator) {
+            navigator.xr.isSessionSupported('immersive-ar')
+              .then((supported) => {
+                if (supported) {
+                  arStatus.textContent = "WebXR AR supported on this device!";
+                } else {
+                  arStatus.textContent = "WebXR supported, but AR not available on this device";
+                }
+              })
+              .catch(() => {
+                arStatus.textContent = "Error checking AR support";
+              });
+          } else if (/(Android|iPhone|iPad)/i.test(navigator.userAgent)) {
+            arStatus.textContent = "AR may be supported through Scene Viewer or Quick Look";
+          } else {
+            arStatus.textContent = "AR not supported on this device/browser";
+          }
         }
-      });
 
-      // Handle any errors
-      modelViewer.addEventListener('error', () => {
-        console.error('Error loading model');
-        loadingOverlay.innerHTML = '<p>Error loading model. Please try again later.</p>';
-      });
-
-      // Fallback: If the model is loaded but overlay still shows after 5 seconds
-      setTimeout(() => {
-        if (!loadingOverlay.classList.contains('hide')) {
+        // Hide loading overlay when model is loaded
+        modelViewer.addEventListener('load', () => {
           loadingOverlay.classList.add('hide');
+        });
+
+        // Also listen for the 'model-visibility' event which might be more reliable
+        modelViewer.addEventListener('model-visibility', (event) => {
+          if (event.detail.visible) {
+            loadingOverlay.classList.add('hide');
+          }
+        });
+
+        // Show loading progress
+        modelViewer.addEventListener('progress', (event) => {
+          const progressPercent = event.detail.totalProgress * 100;
+          progressBar.style.width = `${progressPercent}%`;
+          
+          // If progress reaches 100%, hide the overlay
+          if (progressPercent >= 100) {
+            setTimeout(() => {
+              loadingOverlay.classList.add('hide');
+            }, 500); // Short delay to ensure model has rendered
+          }
+        });
+
+        // Handle any errors
+        modelViewer.addEventListener('error', (error) => {
+          console.error('Error loading model:', error);
+          loadingOverlay.innerHTML = '<p>Error loading model. Please try again later.</p>';
+        });
+
+        // Track AR button clicks
+        const arButton = document.getElementById('ar-button');
+        if (arButton) {
+          arButton.addEventListener('click', () => {
+            console.log('AR button clicked');
+          });
         }
-      }, 5000);
+
+        // Listen for AR mode changes
+        modelViewer.addEventListener('ar-status', (event) => {
+          console.log('AR status:', event.detail.status);
+          if (event.detail.status === 'session-started') {
+            arStatus.textContent = "AR session started!";
+          } else if (event.detail.status === 'not-presenting') {
+            arStatus.textContent = "AR session ended";
+          } else if (event.detail.status === 'failed') {
+            arStatus.textContent = "AR session failed to start: " + (event.detail.statusMessage || "Unknown error");
+          }
+        });
+
+        // Fallback: If the model is loaded but overlay still shows after 5 seconds
+        setTimeout(() => {
+          if (!loadingOverlay.classList.contains('hide')) {
+            loadingOverlay.classList.add('hide');
+          }
+        }, 5000);
+      });
     </script>
   </body>
 </html>
